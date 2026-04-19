@@ -49,21 +49,6 @@ resource "yandex_vpc_security_group" "kittygram_sg" {
     v4_cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS доступ (дополнительно)
-  ingress {
-    description    = "HTTPS access"
-    protocol       = "TCP"
-    port           = 443
-    v4_cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTP доступ (дополнительно)
-  ingress {
-    description    = "HTTP access"
-    protocol       = "TCP"
-    port           = 80
-    v4_cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
 # Cloud-init конфигурация
@@ -78,11 +63,12 @@ resource "yandex_compute_instance" "kittygram_vm" {
   name        = "kittygram-vm"
   description = "Virtual machine for Kittygram application"
   zone        = var.zone
+  platform_id = var.platform_id
 
   resources {
     cores         = var.cores
-    memory        = 4  # 4GB как в существующей ВМ
-    core_fraction = 100  # 100% как в существующей ВМ
+    memory        = var.memory
+    core_fraction = var.core_fraction
   }
 
   boot_disk {
@@ -95,7 +81,7 @@ resource "yandex_compute_instance" "kittygram_vm" {
 
   network_interface {
     subnet_id          = yandex_vpc_subnet.kittygram_subnet.id
-    nat                = true
+    nat                = var.nat
     security_group_ids = [yandex_vpc_security_group.kittygram_sg.id]
   }
 

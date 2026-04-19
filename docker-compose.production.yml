@@ -43,8 +43,7 @@ services:
     image: ${DOCKER_USERNAME}/kittygram_gateway:latest
     container_name: gateway
     ports:
-      - "80:80"
-      - "443:443"
+      - "9000:80"
     volumes:
       - static:/static
       - media:/media

@@ -18,3 +18,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+# Local secrets
+.env
+infra/authorized_key.json

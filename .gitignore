@@ -3,7 +3,6 @@ github_deploy_key
 github_deploy_key.pub
 kittygram.tar.gz
 .DS_Store
-serializers.py
 check_users.py
 create_adm1n.py
 create_user.py

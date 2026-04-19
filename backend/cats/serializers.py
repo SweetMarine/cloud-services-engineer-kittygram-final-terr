@@ -1,55 +1,3 @@
-from rest_framework import serializers
-
-from .models import Achievement, Cat
-
-
-class AchievementSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Achievement
-        fields = ("id", "name")
-
-
-class CatSerializer(serializers.ModelSerializer):
-    achievements = AchievementSerializer(many=True)
-    owner = serializers.SlugRelatedField(
-        slug_field="username",
-        read_only=True,
-    )
-    image = serializers.ImageField(required=False, allow_null=True)
-
-    class Meta:
-        model = Cat
-        fields = (
-            "id",
-            "name",
-            "color",
-            "birth_year",
-            "owner",
-            "achievements",
-            "image",
-        )
-
-    def create_achievements(self, achievements, cat):
-        for achievement in achievements:
-            current_achievement, status = Achievement.objects.get_or_create(
-                **achievement
-            )
-            cat.achievements.add(current_achievement)
-            if not status:
-                current_achievement.save()
-
-    def create(self, validated_data):
-        achievements = validated_data.pop("achievements")
-        cat = Cat.objects.create(**validated_data)
-        self.create_achievements(achievements, cat)
-        return cat
-
-    def update(self, instance, validated_data):
-        if "achievements" in validated_data:
-            achievements = validated_data.pop("achievements")
-            instance.achievements.clear()
-            self.create_achievements(achievements, instance)
-        return super().update(instance, validated_data)
 import base64
 import datetime as dt
 
@@ -116,17 +64,17 @@ class CatSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        if representation['image']:
+        if representation["image"]:
             # Заменяем относительный путь на абсолютный URL
             if instance.image:
-                representation['image'] = '/media/' + str(instance.image)
+                representation["image"] = "/media/" + str(instance.image)
         return representation
 
     def create(self, validated_data):
-        if 'achievements' not in self.initial_data:
+        if "achievements" not in self.initial_data:
             cat = Cat.objects.create(**validated_data)
             return cat
-        achievements = validated_data.pop('achievements')
+        achievements = validated_data.pop("achievements")
         cat = Cat.objects.create(**validated_data)
         for achievement in achievements:
             current_achievement, status = Achievement.objects.get_or_create(
@@ -138,18 +86,18 @@ class CatSerializer(serializers.ModelSerializer):
         return cat
 
     def update(self, instance, validated_data):
-        instance.name = validated_data.get('name', instance.name)
-        instance.color = validated_data.get('color', instance.color)
+        instance.name = validated_data.get("name", instance.name)
+        instance.color = validated_data.get("color", instance.color)
         instance.birth_year = validated_data.get(
-            'birth_year', instance.birth_year
+            "birth_year", instance.birth_year
         )
-        instance.image = validated_data.get('image', instance.image)
+        instance.image = validated_data.get("image", instance.image)
 
-        if 'achievements' not in validated_data:
+        if "achievements" not in validated_data:
             instance.save()
             return instance
 
-        achievements_data = validated_data.pop('achievements')
+        achievements_data = validated_data.pop("achievements")
         lst = []
         for achievement in achievements_data:
             current_achievement, status = Achievement.objects.get_or_create(

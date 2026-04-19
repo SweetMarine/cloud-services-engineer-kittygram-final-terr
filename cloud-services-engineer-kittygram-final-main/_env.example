@@ -1,0 +1,8 @@
+POSTGRES_USER=django_user
+POSTGRES_PASSWORD=django_password
+POSTGRES_DB=kittygram_db
+DB_HOST=postgres
+DB_PORT=5432
+SECRET_KEY=your_secret_key
+DEBUG=False
+ALLOWED_HOSTS=your.domain.com,localhost,127.0.0.1

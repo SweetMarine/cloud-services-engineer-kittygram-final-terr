@@ -1,0 +1,22 @@
+# Yandex Cloud настройки
+cloud_id  = "your-cloud-id-here"
+folder_id = "your-folder-id-here"
+
+# Путь к ключу сервисного аккаунта
+service_account_key_file = "key.json"
+
+# Зона по умолчанию
+default_zone = "ru-central1-a"
+
+# Настройки виртуальной машины
+vm_image_family = "ubuntu-2404-lts"
+vm_cores        = 2
+vm_memory       = 4
+vm_disk_size    = 20
+
+# Путь к SSH ключу
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# S3 настройки для хранения state
+storage_access_key = "your-storage-access-key"
+storage_secret_key = "your-storage-secret-key" 

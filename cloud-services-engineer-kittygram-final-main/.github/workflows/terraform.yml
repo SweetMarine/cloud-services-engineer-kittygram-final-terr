@@ -1,0 +1,177 @@
+---
+  name: Terraform
+  
+  on:
+    workflow_dispatch:
+      inputs:
+        action:
+          description: 'Select the Terraform action'
+          required: true
+          default: 'plan'
+          type: choice
+          options:
+            - plan
+            - apply
+            - destroy
+  
+  jobs:
+    terraform:
+      runs-on: ubuntu-latest
+      env:
+        TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+        TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+        TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}
+  
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+  
+        - name: Setup Terraform
+          uses: hashicorp/setup-terraform@v2
+          with:
+            terraform_version: 1.10.1
+            terraform_wrapper: false
+  
+        - name: Set up Yandex Cloud service account key
+          working-directory: ./infra
+          run: |
+            echo "Setting up service account key..."
+            echo "${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}" | base64 -d > ./authorized_key.json
+            
+            echo "Checking JSON key file..."
+            echo "File size: $(wc -c < ./authorized_key.json) bytes"
+            echo "First 200 characters:"
+            head -c 200 ./authorized_key.json
+            echo ""
+            echo "Last 200 characters:"
+            tail -c 200 ./authorized_key.json
+            echo ""
+            
+            echo "Validating JSON format..."
+            python3 -m json.tool ./authorized_key.json > /dev/null && echo "JSON is valid" || echo "JSON is invalid"
+            
+            echo "Key file setup complete"
+          env:
+            YC_SERVICE_ACCOUNT_KEY_FILE: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}
+  
+        - name: Debug secrets
+          run: |
+            echo "ACCESS_KEY is set: ${{ env.ACCESS_KEY != '' }}"
+            echo "SECRET_KEY is set: ${{ env.SECRET_KEY != '' }}"
+            echo "YC_CLOUD_ID is set: ${{ env.TF_VAR_cloud_id != '' }}"
+            echo "YC_FOLDER_ID is set: ${{ env.TF_VAR_folder_id != '' }}"
+            echo "SSH_PUBLIC_KEY is set: ${{ env.TF_VAR_ssh_key != '' }}"
+            echo "ACCESS_KEY length: ${#ACCESS_KEY}"
+            echo "SECRET_KEY length: ${#SECRET_KEY}"
+          env:
+            ACCESS_KEY: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+            TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+            TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+            TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}
+
+        - name: Clean Terraform cache
+          working-directory: ./infra
+          run: |
+            rm -rf .terraform
+            rm -f .terraform.lock.hcl
+
+        - name: Debug S3 access
+          run: |
+            # Установка AWS CLI для работы с Yandex Cloud S3
+            pip install awscli
+            
+            echo "=== S3 Access Debug ==="
+            echo "Using endpoint: https://storage.yandexcloud.net"
+            echo "Using region: ru-central1"
+            echo "Bucket name: kittygram-terraform-state-158160191213"
+            echo "Access Key length: ${#AWS_ACCESS_KEY_ID}"
+            echo "Secret Key length: ${#AWS_SECRET_ACCESS_KEY}"
+            
+            echo "=== Testing credentials ==="
+            # Проверим, работают ли credentials вообще
+            echo "1. Testing basic S3 access..."
+            aws s3 ls --endpoint-url https://storage.yandexcloud.net --region ru-central1 || echo "Failed to list buckets"
+            
+            echo "2. Listing all available buckets..."
+            aws s3 ls --endpoint-url https://storage.yandexcloud.net --region ru-central1
+            
+            echo "3. Testing specific bucket..."
+            aws s3 ls s3://kittygram-terraform-state-158160191213 --endpoint-url https://storage.yandexcloud.net --region ru-central1 || echo "Bucket not found or no access"
+            
+            echo "4. Testing bucket location..."
+            aws s3api get-bucket-location --bucket kittygram-terraform-state-158160191213 --endpoint-url https://storage.yandexcloud.net --region ru-central1 || echo "Cannot get bucket location"
+            
+            echo "=== Debug complete ==="
+          env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+
+        - name: Terraform Initialize
+          working-directory: ./infra
+          run: terraform init -backend-config="access_key=$ACCESS_KEY" -backend-config="secret_key=$SECRET_KEY"
+          env:
+            ACCESS_KEY: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+            TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+            TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+            TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}
+
+        - name: Import existing resources
+          working-directory: ./infra
+          if: ${{ github.event.inputs.action == 'apply' }}
+          run: |
+            echo "Importing existing resources into Terraform state..."
+            
+            # Import existing VM
+            terraform import yandex_compute_instance.kittygram_vm fhmi8e4gudufvf784d1p || echo "VM already imported or not found"
+            
+            # Import existing network
+            terraform import yandex_vpc_network.kittygram_network enp5p4rfk6j7np2qdakg || echo "Network already imported or not found"
+            
+            # Import existing subnet
+            terraform import yandex_vpc_subnet.kittygram_subnet e9bsdviu42pq9biel6kd || echo "Subnet already imported or not found"
+            
+            # Import existing security group
+            terraform import yandex_vpc_security_group.kittygram_sg enpjir5f5go2h5dqesc0 || echo "Security group already imported or not found"
+            
+            echo "Import completed"
+          env:
+            ACCESS_KEY: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+            TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+            TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+            TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}
+  
+        - name: Terraform Plan
+          working-directory: ./infra
+          if: ${{ github.event.inputs.action == 'plan' }}
+          run: terraform plan
+          env:
+            ACCESS_KEY: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+            TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+            TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+            TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}
+  
+        - name: Terraform Apply
+          working-directory: ./infra
+          if: ${{ github.event.inputs.action == 'apply' }}
+          run: terraform apply -auto-approve
+          env:
+            ACCESS_KEY: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+            TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+            TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+            TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}
+  
+        - name: Terraform Destroy
+          working-directory: ./infra
+          if: ${{ github.event.inputs.action == 'destroy' }}
+          run: terraform destroy -auto-approve
+          env:
+            ACCESS_KEY: ${{ secrets.YC_STORAGE_ACCESS_KEY }}
+            SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
+            TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+            TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+            TF_VAR_ssh_key: ${{ secrets.SSH_PUBLIC_KEY }}

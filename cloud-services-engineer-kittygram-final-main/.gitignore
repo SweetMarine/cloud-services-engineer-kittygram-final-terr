@@ -1,0 +1,20 @@
+github_deploy_key_base64.txt
+github_deploy_key
+github_deploy_key.pub
+kittygram.tar.gz
+.DS_Store
+serializers.py
+check_users.py
+create_adm1n.py
+create_user.py
+fix_serializer.py
+fixed_serializer.py
+set_password.py
+stop_containers.sh
+index.html
+
+# Python кэш-файлы
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

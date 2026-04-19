@@ -283,12 +283,6 @@ kittygram-final/
 - [x] Функциональность проекта Kittygram соответствует описанию
 - [x] Итоговый состав репозитория соответствует требованиям
 
-## 📞 Контакты
-
-- **Автор**: Denis Sugakov
-- **GitHub**: [@DSugakov](https://github.com/DSugakov)
-- **Проект**: [cloud-services-engineer-kittygram-final](https://github.com/DSugakov/cloud-services-engineer-kittygram-final)
-
 ---
 
 > **Примечание**: Этот проект создан в рамках курса "DevOps-инженер облачных сервисов" и демонстрирует современные практики CI/CD, контейнеризации и автоматизации развертывания.

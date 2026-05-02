@@ -16,5 +16,8 @@ nat           = true
 # SSH public key content (not file path)
 ssh_key = "ssh-ed25519 AAAA... user@host"
 
+# Логин на ВМ и в секрете REMOTE_USER (Yandex OS Login: обычно ваш логин, напр. mee)
+vm_ssh_login = "ubuntu"
+
 # Service account key file path created in CI job
 sa_key_file = "authorized_key.json"

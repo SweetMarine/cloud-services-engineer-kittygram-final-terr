@@ -145,21 +145,36 @@ jobs:
           echo "ALLOWED_HOSTS=${{ secrets.ALLOWED_HOSTS }}" >> .env
           echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" >> .env
       - name: Set up SSH
+        env:
+          REMOTE_SSH_KEY: ${{ secrets.REMOTE_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.REMOTE_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.REMOTE_HOST }} >> ~/.ssh/known_hosts
+          set -euo pipefail
+          mkdir -p -m 700 ~/.ssh
+          printf '%s\n' "$REMOTE_SSH_KEY" > ~/.ssh/id_kittygram_deploy
+          chmod 600 ~/.ssh/id_kittygram_deploy
+          ssh-keyscan -H "$REMOTE_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          {
+            echo "Host kittygram-deploy"
+            echo "  HostName $REMOTE_HOST"
+            echo "  User $REMOTE_USER"
+            echo "  IdentityFile ~/.ssh/id_kittygram_deploy"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+          } >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Copy files to server
         run: |
-          ssh ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} 'mkdir -p ~/kittygram/nginx'
-          scp docker-compose.production.yml .build_info .env ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:~/kittygram/
-          scp nginx/default.conf ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:~/kittygram/nginx/default.conf
+          set -euo pipefail
+          ssh kittygram-deploy 'mkdir -p ~/kittygram/nginx'
+          scp docker-compose.production.yml .build_info .env kittygram-deploy:~/kittygram/
+          scp nginx/default.conf kittygram-deploy:~/kittygram/nginx/default.conf
 
       - name: Deploy on server
         run: |
-          ssh ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} << 'EOF'
+          ssh kittygram-deploy << 'EOF'
             cd ~/kittygram/
             echo "Docker login"
             echo "${{ secrets.DOCKER_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin

@@ -15,10 +15,10 @@ packages:
   - htop
   - nano
 
-# Создание пользователя ubuntu (если не существует)
+# Пользователь для SSH и деплоя (совпадайте с секретом REMOTE_USER в GitHub)
 users:
-  - name: ubuntu
-    groups: sudo, docker
+  - name: ${ssh_username}
+    groups: sudo
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     ssh-authorized-keys:
@@ -41,16 +41,11 @@ runcmd:
   - systemctl start docker
   - systemctl enable docker
   
-  # Добавление пользователя ubuntu в группу docker
-  - usermod -aG docker ubuntu
-  
-  # Создание рабочей директории
-  - mkdir -p /home/ubuntu/kittygram
-  - chown ubuntu:ubuntu /home/ubuntu/kittygram
-  
-  # Создание символической ссылки для совместимости
-  - mkdir -p /home/ubuntu/kittygram/cloud-services-engineer-kittygram-final
-  - chown ubuntu:ubuntu /home/ubuntu/kittygram/cloud-services-engineer-kittygram-final
+  - usermod -aG docker ${ssh_username}
+  - mkdir -p /home/${ssh_username}/kittygram
+  - chown ${ssh_username}:${ssh_username} /home/${ssh_username}/kittygram
+  - mkdir -p /home/${ssh_username}/kittygram/cloud-services-engineer-kittygram-final
+  - chown ${ssh_username}:${ssh_username} /home/${ssh_username}/kittygram/cloud-services-engineer-kittygram-final
 
 # Перезагрузка после установки
 power_state:

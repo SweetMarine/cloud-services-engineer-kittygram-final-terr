@@ -8,6 +8,11 @@ output "vm_external_ip" {
   description = "Public IPv4 address of the VM"
 }
 
+output "vm_ssh_login" {
+  value       = var.vm_ssh_login
+  description = "Пользователь SSH — тот же, что в секрете REMOTE_USER для deploy.yml"
+}
+
 output "vm_internal_ip" {
   value       = yandex_compute_instance.kittygram_vm.network_interface[0].ip_address
   description = "Internal IPv4 address of the VM"

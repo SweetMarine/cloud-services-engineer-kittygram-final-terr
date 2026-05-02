@@ -9,6 +9,12 @@ variable "ssh_key" {
   type        = string
 }
 
+variable "vm_ssh_login" {
+  description = "Linux user for SSH and cloud-init (образ *-oslogin в Yandex: часто логин из консоли, например mee)"
+  type        = string
+  default     = "ubuntu"
+}
+
 variable "cloud_id" {
   description = "Yandex Cloud ID"
   type        = string

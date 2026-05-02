@@ -32,9 +32,18 @@ jobs:
 
       - name: Prepare service account key
         working-directory: ./infra
+        env:
+          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}
         run: |
-          KEY_CONTENT='${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}'
-          echo "$KEY_CONTENT" | base64 -d > authorized_key.json 2>/dev/null || echo "$KEY_CONTENT" > authorized_key.json
+          set -euo pipefail
+          printf '%s\n' "$SA_KEY" > sa_key_input.txt
+          if python3 -c "import json; json.load(open('sa_key_input.txt'))" 2>/dev/null; then
+            mv sa_key_input.txt authorized_key.json
+          else
+            base64 -d < sa_key_input.txt > authorized_key.json
+            python3 -c "import json; json.load(open('authorized_key.json'))"
+          fi
+          rm -f sa_key_input.txt
 
       - name: Terraform Init
         working-directory: ./infra
@@ -55,6 +64,13 @@ jobs:
         working-directory: ./infra
         if: ${{ github.event.inputs.action == 'apply' }}
         run: terraform apply -auto-approve
+
+      - name: Print VM IP and SSH user (REMOTE_HOST, REMOTE_USER, tests.yml)
+        working-directory: ./infra
+        if: ${{ github.event.inputs.action == 'apply' }}
+        run: |
+          terraform output -no-color vm_external_ip
+          terraform output -no-color vm_ssh_login
 
       - name: Terraform Destroy
         working-directory: ./infra

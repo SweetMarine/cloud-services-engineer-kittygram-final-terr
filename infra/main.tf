@@ -55,6 +55,7 @@ resource "yandex_vpc_security_group" "kittygram_sg" {
 locals {
   cloud_init_config = templatefile("${path.module}/cloud-init.yml", {
     ssh_public_key = var.ssh_key
+    ssh_username   = var.vm_ssh_login
   })
 }
 
@@ -90,7 +91,8 @@ resource "yandex_compute_instance" "kittygram_vm" {
   }
 
   scheduling_policy {
-    preemptible = true  # Прерываемая ВМ для экономии
+    # Обычная ВМ: прерываемую Yandex может остановить — упадёт SSH и :9000
+    preemptible = false
   }
 
   labels = {

@@ -30,15 +30,27 @@ def test_terraform_validate():
             return False
         
         print(f"✅ Terraform версия: {result.stdout.strip()}")
-        
+
+        # Без init провайдер не скачан — validate падает на свежем клоне
+        result = subprocess.run(
+            ["terraform", "init", "-backend=false", "-input=false"],
+            capture_output=True,
+            text=True,
+            cwd=infra_dir,
+        )
+        if result.returncode != 0:
+            print(f"❌ Terraform init -backend=false failed: {result.stderr or result.stdout}")
+            return False
+        print("✅ Terraform init (без remote backend) выполнен")
+
         # Проверяем валидность конфигурации
         result = subprocess.run(
             ["terraform", "validate"],
             capture_output=True,
             text=True,
-            cwd=infra_dir
+            cwd=infra_dir,
         )
-        
+
         if result.returncode != 0:
             print(f"❌ Terraform validate failed: {result.stderr}")
             return False

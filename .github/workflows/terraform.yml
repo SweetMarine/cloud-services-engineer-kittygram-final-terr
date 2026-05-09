@@ -25,6 +25,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify required secrets (fail fast with a clear message)
+        env:
+          ACCESS_KEY: ${{ secrets.ACCESS_KEY || secrets.YC_STORAGE_ACCESS_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY || secrets.YC_STORAGE_SECRET_KEY }}
+          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}
+          YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          err() { echo "::error::$1"; exit 1; }
+          [ -n "${ACCESS_KEY}" ] && [ -n "${SECRET_KEY}" ] || err "Задайте секреты ACCESS_KEY и SECRET_KEY (ключи статического доступа к Object Storage для бакета Terraform state). Допустимы имена YC_STORAGE_ACCESS_KEY и YC_STORAGE_SECRET_KEY."
+          [ -n "${SA_KEY}" ] || err "Задайте секрет YC_SERVICE_ACCOUNT_KEY_FILE (JSON ключ сервисного аккаунта Yandex Cloud для Terraform provider)."
+          [ -n "${YC_CLOUD_ID}" ] || err "Задайте секрет YC_CLOUD_ID."
+          [ -n "${YC_FOLDER_ID}" ] || err "Задайте секрет YC_FOLDER_ID."
+          [ -n "${SSH_PUBLIC_KEY}" ] || err "Задайте секрет SSH_PUBLIC_KEY (публичный SSH-ключ для cloud-init на ВМ)."
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -48,22 +65,30 @@ jobs:
       - name: Terraform Init
         working-directory: ./infra
         run: |
-          terraform init \
-            -backend-config="access_key=${ACCESS_KEY}" \
+          set -euo pipefail
+          init_args=(
+            -input=false
+            -backend-config="access_key=${ACCESS_KEY}"
             -backend-config="secret_key=${SECRET_KEY}"
+          )
+          if [ -n "${TF_STATE_BUCKET:-}" ]; then
+            init_args+=(-backend-config="bucket=${TF_STATE_BUCKET}")
+          fi
+          terraform init "${init_args[@]}"
         env:
           ACCESS_KEY: ${{ secrets.ACCESS_KEY || secrets.YC_STORAGE_ACCESS_KEY }}
           SECRET_KEY: ${{ secrets.SECRET_KEY || secrets.YC_STORAGE_SECRET_KEY }}
+          TF_STATE_BUCKET: ${{ secrets.YC_TFSTATE_BUCKET }}
 
       - name: Terraform Plan
         working-directory: ./infra
         if: ${{ github.event.inputs.action == 'plan' }}
-        run: terraform plan
+        run: terraform plan -input=false
 
       - name: Terraform Apply
         working-directory: ./infra
         if: ${{ github.event.inputs.action == 'apply' }}
-        run: terraform apply -auto-approve
+        run: terraform apply -input=false -auto-approve
 
       - name: Print VM IP and SSH user (REMOTE_HOST, REMOTE_USER, tests.yml)
         working-directory: ./infra
@@ -75,4 +100,4 @@ jobs:
       - name: Terraform Destroy
         working-directory: ./infra
         if: ${{ github.event.inputs.action == 'destroy' }}
-        run: terraform destroy -auto-approve
+        run: terraform destroy -input=false -auto-approve

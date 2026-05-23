@@ -35,7 +35,7 @@ jobs:
         env:
           ACCESS_KEY: ${{ secrets.ACCESS_KEY || secrets.YC_STORAGE_ACCESS_KEY }}
           SECRET_KEY: ${{ secrets.SECRET_KEY || secrets.YC_STORAGE_SECRET_KEY }}
-          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}
+          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE || secrets.YC_SERVICE_ACCOUNT_KEY || secrets.SA_KEY }}
           YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
           YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
           SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           err() { echo "::error::$1"; exit 1; }
           [ -n "${ACCESS_KEY}" ] && [ -n "${SECRET_KEY}" ] || err "Задайте секреты ACCESS_KEY и SECRET_KEY (ключи статического доступа к Object Storage для бакета Terraform state). Допустимы имена YC_STORAGE_ACCESS_KEY и YC_STORAGE_SECRET_KEY."
-          [ -n "${SA_KEY}" ] || err "Задайте секрет YC_SERVICE_ACCOUNT_KEY_FILE (JSON ключ сервисного аккаунта Yandex Cloud для Terraform provider)."
+          [ -n "${SA_KEY}" ] || err "Задайте секрет YC_SERVICE_ACCOUNT_KEY_FILE (или YC_SERVICE_ACCOUNT_KEY / SA_KEY) — JSON ключ сервисного аккаунта Yandex Cloud."
           [ -n "${YC_CLOUD_ID}" ] || err "Задайте секрет YC_CLOUD_ID."
           [ -n "${YC_FOLDER_ID}" ] || err "Задайте секрет YC_FOLDER_ID."
           [ -n "${SSH_PUBLIC_KEY}" ] || err "Задайте секрет SSH_PUBLIC_KEY (публичный SSH-ключ для cloud-init на ВМ)."
@@ -56,77 +56,10 @@ jobs:
       - name: Prepare service account key
         working-directory: ./infra
         env:
-          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE }}
+          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE || secrets.YC_SERVICE_ACCOUNT_KEY || secrets.SA_KEY }}
         run: |
           set -euo pipefail
-          python3 << 'PY'
-          import base64
-          import json
-          import os
-          import sys
-
-          raw = os.environ.get("SA_KEY", "").strip().lstrip("\ufeff")
-          if not raw:
-              print("::error::Секрет YC_SERVICE_ACCOUNT_KEY_FILE пустой.", file=sys.stderr)
-              sys.exit(1)
-
-          REQUIRED = {"id", "service_account_id", "private_key"}
-
-          def validate_key(obj: object) -> dict:
-              if not isinstance(obj, dict):
-                  raise ValueError("ожидается JSON-объект authorized_key.json")
-              missing = REQUIRED - obj.keys()
-              if missing:
-                  raise ValueError(
-                      "нет обязательных полей: " + ", ".join(sorted(missing))
-                  )
-              return obj
-
-          def write_key(obj: dict) -> None:
-              with open("authorized_key.json", "w", encoding="utf-8") as fh:
-                  json.dump(obj, fh, ensure_ascii=False)
-              print("authorized_key.json создан")
-
-          def try_json(text: str) -> dict | None:
-              try:
-                  return validate_key(json.loads(text))
-              except (json.JSONDecodeError, ValueError):
-                  return None
-
-          def try_base64_json(text: str) -> dict | None:
-              try:
-                  blob = "".join(text.split())
-                  pad = (-len(blob)) % 4
-                  decoded = base64.b64decode(blob + "=" * pad, validate=False).decode("utf-8")
-                  return validate_key(json.loads(decoded))
-              except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
-                  return None
-
-          attempts = [
-              ("JSON", try_json(raw)),
-              ("base64(JSON)", try_base64_json(raw)),
-          ]
-          if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
-              attempts.append((f"JSON в {raw[0]!r}", try_json(raw[1:-1])))
-              attempts.append(
-                  (f"base64(JSON) в {raw[0]!r}", try_base64_json(raw[1:-1]))
-              )
-
-          for label, key in attempts:
-              if key is not None:
-                  write_key(key)
-                  print(f"Формат секрета: {label}")
-                  sys.exit(0)
-
-          print(
-              "::error::Не удалось разобрать YC_SERVICE_ACCOUNT_KEY_FILE. "
-              "В секрет нужно вставить полное содержимое файла authorized_key.json "
-              "из Yandex Cloud (IAM → Сервисные аккаунты → Создать ключ → JSON). "
-              "Либо одну строку base64: base64 -w0 authorized_key.json",
-              file=sys.stderr,
-          )
-          sys.exit(1)
-          PY
+          python3 prepare_sa_key.py
 
       - name: Terraform Init
         working-directory: ./infra

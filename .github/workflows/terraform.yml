@@ -48,6 +48,14 @@ jobs:
           [ -n "${YC_FOLDER_ID}" ] || err "Задайте секрет YC_FOLDER_ID."
           [ -n "${SSH_PUBLIC_KEY}" ] || err "Задайте секрет SSH_PUBLIC_KEY (публичный SSH-ключ для cloud-init на ВМ)."
 
+      - name: Verify SA key format
+        working-directory: ./infra
+        env:
+          SA_KEY_B64: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_B64 }}
+          SA_KEY_JSON: ${{ toJSON(secrets.YC_SERVICE_ACCOUNT_KEY_FILE || secrets.YC_SERVICE_ACCOUNT_KEY || secrets.SA_KEY) }}
+          SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE || secrets.YC_SERVICE_ACCOUNT_KEY || secrets.SA_KEY }}
+        run: python3 prepare_sa_key.py --dry-run
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -56,10 +64,10 @@ jobs:
       - name: Prepare service account key
         working-directory: ./infra
         env:
+          SA_KEY_B64: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_B64 }}
+          SA_KEY_JSON: ${{ toJSON(secrets.YC_SERVICE_ACCOUNT_KEY_FILE || secrets.YC_SERVICE_ACCOUNT_KEY || secrets.SA_KEY) }}
           SA_KEY: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_FILE || secrets.YC_SERVICE_ACCOUNT_KEY || secrets.SA_KEY }}
-        run: |
-          set -euo pipefail
-          python3 prepare_sa_key.py
+        run: python3 prepare_sa_key.py
 
       - name: Terraform Init
         working-directory: ./infra
